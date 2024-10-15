@@ -13,7 +13,7 @@ module.exports = {
     }
 
     try {
-      const apiUrl = `https://deku-rest-api-3ijr.onrender.com/smsb?number=${number}&amount=${amount}&delay=${delay}`;
+      const apiUrl = `https://deku-rest-apis.ooguy.com/smsb?number=${number}&amount=${amount}&delay=${delay}`;
       const response = await axios.get(apiUrl);
       
       const { status, success, fail } = response.data;
