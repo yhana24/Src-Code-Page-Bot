@@ -3,7 +3,7 @@ const path = require('path');
 const { sendMessage } = require('./sendMessage');
 
 const commands = new Map();
-const prefix = '/';
+const prefix = '-';
 
 const commandFiles = fs.readdirSync(path.join(__dirname, '../commands')).filter(file => file.endsWith('.js'));
 for (const file of commandFiles) {
@@ -12,12 +12,26 @@ for (const file of commandFiles) {
 }
 
 async function handleMessage(event, pageAccessToken) {
-  const senderId = event.sender.id;
-  const messageText = event.message.text.trim();
+  if (!event || !event.sender || !event.sender.id) {
+    console.error('Invalid event object');
+    return;
+  }
 
-  if (messageText.startsWith(prefix)) {
-    const args = messageText.slice(prefix.length).split(' ');
-    const commandName = args.shift().toLowerCase();
+  const senderId = event.sender.id;
+
+  if (event.message && event.message.text) {
+    const messageText = event.message.text.trim();
+
+    let commandName, args;
+    if (messageText.startsWith(prefix)) {
+      const argsArray = messageText.slice(prefix.length).split(' ');
+      commandName = argsArray.shift().toLowerCase();
+      args = argsArray;
+    } else {
+      const words = messageText.split(' ');
+      commandName = words.shift().toLowerCase();
+      args = words;
+    }
 
     if (commands.has(commandName)) {
       const command = commands.get(commandName);
@@ -25,21 +39,19 @@ async function handleMessage(event, pageAccessToken) {
         await command.execute(senderId, args, pageAccessToken, sendMessage);
       } catch (error) {
         console.error(`Error executing command ${commandName}:`, error);
-        sendMessage(senderId, { text: 'There was an error executing that command.' }, pageAccessToken);
+        if (error.message) {
+          sendMessage(senderId, { text: error.message }, pageAccessToken);
+        } else {
+          sendMessage(senderId, { text: 'There was an error executing that command.' }, pageAccessToken);
+        }
       }
+      return;
     }
-    return;
-  }
-
-  const aiCommand = commands.get('ai');
-  if (aiCommand) {
-    try {
-      await aiCommand.execute(senderId, messageText, pageAccessToken, sendMessage);
-    } catch (error) {
-      console.error('Error executing Ai command:', error);
-      sendMessage(senderId, { text: 'There was an error processing your request.' }, pageAccessToken);
-    }
+  } else if (event.message) {
+    console.log('Received message without text');
+  } else {
+    console.log('Received event without message');
   }
 }
 
-module.exports = { handleMessage }; // Closing the object here
+module.exports = { handleMessage };
