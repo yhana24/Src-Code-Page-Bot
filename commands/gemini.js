@@ -1,24 +1,19 @@
-const { callGeminiAPI } = require('../utils/callGeminiAPI');
+const axios = require('axios');
 const { sendMessage } = require('../handles/sendMessage');
 
 module.exports = {
   name: 'gemini',
-  description: 'Ask a question to the Gemini AI',
-  author: 'ChatGPT',
+  description: 'Interact with Google Gemini',
+  author: 'coffee',
   async execute(senderId, args, pageAccessToken) {
     const prompt = args.join(' ');
-    sendMessage(senderId, { text: '💬 | 𝙰𝚗𝚜𝚠𝚎𝚛𝚒𝚗𝚐...' }, pageAccessToken);
+    if (!prompt) return sendMessage(senderId, { text: "Usage: gemini <your message>" }, pageAccessToken);
 
     try {
-      const chunks = splitMessageIntoChunks(await callGeminiAPI(prompt), 2000);
-      chunks.forEach(message => sendMessage(senderId, { text: message }, pageAccessToken));
+      const { data } = await axios.get(`https://joshweb.click/gemini?prompt=${encodeURIComponent(prompt)}`);
+      sendMessage(senderId, { text: data.gemini }, pageAccessToken);
     } catch {
-      sendMessage(senderId, { text: '.' }, pageAccessToken);
+      sendMessage(senderId, { text: 'Error generating response. Try again later.' }, pageAccessToken);
     }
   }
 };
-
-const splitMessageIntoChunks = (message, chunkSize) =>
-  Array.from({ length: Math.ceil(message.length / chunkSize) }, (_, i) =>
-    message.slice(i * chunkSize, (i + 1) * chunkSize)
-  );
