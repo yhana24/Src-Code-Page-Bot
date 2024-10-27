@@ -4,6 +4,7 @@ const { sendMessage } = require('../handles/sendMessage');
 module.exports = {
   name: 'lyrics',
   description: 'Fetch song lyrics',
+  usage: 'lyrics [song name]',
   author: 'coffee',
 
   async execute(senderId, args, pageAccessToken) {
