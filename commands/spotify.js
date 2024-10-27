@@ -4,6 +4,7 @@ const { sendMessage } = require('../handles/sendMessage');
 module.exports = {
   name: 'spotify',
   description: 'search and play spotify song.',
+  usage: 'spotify [song name]',
   author: 'coffee',
 
   async execute(senderId, args, pageAccessToken) {
