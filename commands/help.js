@@ -11,7 +11,6 @@ module.exports = {
     const commandsDir = path.join(__dirname, '../commands');
     const commandFiles = fs.readdirSync(commandsDir).filter(file => file.endsWith('.js'));
 
-    // If a specific command name is provided
     if (args.length > 0) {
       const commandName = args[0].toLowerCase();
       const commandFile = commandFiles.find(file => {
@@ -35,7 +34,6 @@ module.exports = {
       return;
     }
 
-    // If no specific command is requested, show the list of commands
     const commands = commandFiles.map(file => {
       const command = require(path.join(commandsDir, file));
       return `│ - ${command.name}`;
