@@ -1,50 +1,39 @@
 const fs = require('fs');
 const path = require('path');
-const axios = require('axios');
 const { sendMessage } = require('./sendMessage');
-const { handlePostback } = require('./handlePostback');
+
+const commands = new Map();
+const prefix = '-';
 
 // Load command modules
-const commands = Object.fromEntries(
-  fs.readdirSync(path.join(__dirname, '../commands'))
-    .filter(file => file.endsWith('.js'))
-    .map(file => [require(`../commands/${file}`).name.toLowerCase(), require(`../commands/${file}`)])
-);
+fs.readdirSync(path.join(__dirname, '../commands'))
+  .filter(file => file.endsWith('.js'))
+  .forEach(file => {
+    const command = require(`../commands/${file}`);
+    commands.set(command.name.toLowerCase(), command);
+  });
 
-const handleMessage = async (event, pageAccessToken) => {
+async function handleMessage(event, pageAccessToken) {
   const senderId = event?.sender?.id;
   if (!senderId) return console.error('Invalid event object');
 
   const messageText = event?.message?.text?.trim();
-  if (!messageText) {
-    console.error('No message text found');
-    return;
-  }
+  if (!messageText) return console.log('Received event without message text');
 
-  const [commandName, ...args] = messageText.startsWith('-') 
-    ? messageText.slice(1).split(' ') 
+  const [commandName, ...args] = messageText.startsWith(prefix)
+    ? messageText.slice(prefix.length).split(' ')
     : messageText.split(' ');
 
-  const cmd = commands[commandName.toLowerCase()];
-
   try {
-    if (cmd) {
-      await cmd.execute(senderId, args, pageAccessToken, event);
+    if (commands.has(commandName.toLowerCase())) {
+      await commands.get(commandName.toLowerCase()).execute(senderId, args, pageAccessToken, sendMessage);
     } else {
-      await commands['ai'].execute(senderId, [messageText], pageAccessToken);
+      await commands.get('ai').execute(senderId, [messageText], pageAccessToken);
     }
   } catch (error) {
     console.error(`Error executing command:`, error);
-    await sendMessage(senderId, { text: 'There was an error executing that command.' }, pageAccessToken);
+    await sendMessage(senderId, { text: error.message || 'There was an error executing that command.' }, pageAccessToken);
   }
-
-  if (event?.postback) {
-    try {
-      await handlePostback(event, pageAccessToken);
-    } catch (error) {
-      console.error('Error handling postback:', error);
-    }
-  }
-};
+}
 
 module.exports = { handleMessage };
