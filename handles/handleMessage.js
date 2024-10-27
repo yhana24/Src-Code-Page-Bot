@@ -1,57 +1,50 @@
 const fs = require('fs');
 const path = require('path');
+const axios = require('axios');
 const { sendMessage } = require('./sendMessage');
+const { handlePostback } = require('./handlePostback');
 
-const commands = new Map();
-const prefix = '-';
+// Load command modules
+const commands = Object.fromEntries(
+  fs.readdirSync(path.join(__dirname, '../commands'))
+    .filter(file => file.endsWith('.js'))
+    .map(file => [require(`../commands/${file}`).name.toLowerCase(), require(`../commands/${file}`)])
+);
 
-const commandFiles = fs.readdirSync(path.join(__dirname, '../commands')).filter(file => file.endsWith('.js'));
-for (const file of commandFiles) {
-  const command = require(`../commands/${file}`);
-  commands.set(command.name.toLowerCase(), command);
-}
+const handleMessage = async (event, pageAccessToken) => {
+  const senderId = event?.sender?.id;
+  if (!senderId) return console.error('Invalid event object');
 
-async function handleMessage(event, pageAccessToken) {
-  if (!event || !event.sender || !event.sender.id) {
-    console.error('Invalid event object');
+  const messageText = event?.message?.text?.trim();
+  if (!messageText) {
+    console.error('No message text found');
     return;
   }
 
-  const senderId = event.sender.id;
+  const [commandName, ...args] = messageText.startsWith('-') 
+    ? messageText.slice(1).split(' ') 
+    : messageText.split(' ');
 
-  if (event.message && event.message.text) {
-    const messageText = event.message.text.trim();
+  const cmd = commands[commandName.toLowerCase()];
 
-    let commandName, args;
-    if (messageText.startsWith(prefix)) {
-      const argsArray = messageText.slice(prefix.length).split(' ');
-      commandName = argsArray.shift().toLowerCase();
-      args = argsArray;
+  try {
+    if (cmd) {
+      await cmd.execute(senderId, args, pageAccessToken, event);
     } else {
-      const words = messageText.split(' ');
-      commandName = words.shift().toLowerCase();
-      args = words;
+      await commands['ai'].execute(senderId, [messageText], pageAccessToken);
     }
-
-    if (commands.has(commandName)) {
-      const command = commands.get(commandName);
-      try {
-        await command.execute(senderId, args, pageAccessToken, sendMessage);
-      } catch (error) {
-        console.error(`Error executing command ${commandName}:`, error);
-        if (error.message) {
-          sendMessage(senderId, { text: error.message }, pageAccessToken);
-        } else {
-          sendMessage(senderId, { text: 'There was an error executing that command.' }, pageAccessToken);
-        }
-      }
-      return;
-    }
-  } else if (event.message) {
-    console.log('Received message without text');
-  } else {
-    console.log('Received event without message');
+  } catch (error) {
+    console.error(`Error executing command:`, error);
+    await sendMessage(senderId, { text: 'There was an error executing that command.' }, pageAccessToken);
   }
-}
+
+  if (event?.postback) {
+    try {
+      await handlePostback(event, pageAccessToken);
+    } catch (error) {
+      console.error('Error handling postback:', error);
+    }
+  }
+};
 
 module.exports = { handleMessage };
