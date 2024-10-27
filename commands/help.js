@@ -10,13 +10,45 @@ module.exports = {
     const commandsDir = path.join(__dirname, '../commands');
     const commandFiles = fs.readdirSync(commandsDir).filter(file => file.endsWith('.js'));
 
+    // If a specific command name is provided
+    if (args.length > 0) {
+      const commandName = args[0].toLowerCase();
+      const commandFile = commandFiles.find(file => {
+        const command = require(path.join(commandsDir, file));
+        return command.name.toLowerCase() === commandName;
+      });
+
+      if (commandFile) {
+        const command = require(path.join(commandsDir, commandFile));
+        const commandDetails = `
+━━━━━━━━━━━━━━
+𝙲𝚘𝚖𝚖𝚊𝚗𝚍 𝙽𝚊𝚖𝚎: ${command.name}
+𝙳𝚎𝚜𝚌𝚛𝚒𝚋𝚝𝚒𝚘𝚗: ${command.description}
+𝚄𝚜𝚊𝚐𝚎: ${command.usage}
+━━━━━━━━━━━━━━`;
+        
+        sendMessage(senderId, { text: commandDetails }, pageAccessToken);
+      } else {
+        sendMessage(senderId, { text: `Command "${commandName}" not found.` }, pageAccessToken);
+      }
+      return;
+    }
+
+    // If no specific command is requested, show the list of commands
     const commands = commandFiles.map(file => {
       const command = require(path.join(commandsDir, file));
-      return `⟿ ${command.name}\n  - ${command.description}\n  - Credits: ${command.author}`;
+      return `│ - ${command.name}`;
     });
 
-    const totalCommands = commandFiles.length;
-    const helpMessage = `Here are the available commands: \nTotal commands: ${totalCommands} \n\n${commands.join('\n\n')}`;
+    const helpMessage = `
+━━━━━━━━━━━━━━
+𝙰𝚟𝚊𝚒𝚕𝚊𝚋𝚕𝚎 𝙲𝚘𝚖𝚖𝚊𝚗𝚍𝚜:
+╭─╼━━━━━━━━╾─╮
+${commands.join('\n')}
+╰─━━━━━━━━━╾─╯
+Chat -help [name] 
+to see command details.
+━━━━━━━━━━━━━━`;
 
     sendMessage(senderId, { text: helpMessage }, pageAccessToken);
   }
