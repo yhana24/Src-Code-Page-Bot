@@ -3,12 +3,12 @@ const { sendMessage } = require('../handles/sendMessage');
 
 module.exports = {
   name: 'gpt4',
-  description: 'Generate text using toshia datasets',
+  description: 'Interact with GPT-4o',
   author: 'coffee',
   async execute(senderId, args, pageAccessToken) {
     const prompt = args.join(' ');
     if (!prompt) return sendMessage(senderId, { text: "Usage: gpt4 <question>" }, pageAccessToken);
-    
+
     sendMessage(senderId, { text: 'Generating content... Please wait.' }, pageAccessToken);
 
     try {
