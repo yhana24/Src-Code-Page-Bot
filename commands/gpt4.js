@@ -6,11 +6,10 @@ module.exports = {
   description: 'Interact with GPT-4o',
   usage: 'gpt4 [your message]',
   author: 'coffee',
+
   async execute(senderId, args, pageAccessToken) {
     const prompt = args.join(' ');
     if (!prompt) return sendMessage(senderId, { text: "Usage: gpt4 <question>" }, pageAccessToken);
-
-    sendMessage(senderId, { text: 'Generating content... Please wait.' }, pageAccessToken);
 
     try {
       const { data: { result } } = await axios.get(`https://joshweb.click/api/gpt-4o?q=${encodeURIComponent(prompt)}&uid=${senderId}`);
