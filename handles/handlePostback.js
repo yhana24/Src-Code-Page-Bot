@@ -1,11 +1,16 @@
 const { sendMessage } = require('./sendMessage');
 
-function handlePostback(event, pageAccessToken) {
-  const senderId = event.sender.id;
-  const payload = event.postback.payload;
+const handlePostback = async (event, pageAccessToken) => {
+  const { id: senderId } = event.sender || {};
+  const { payload } = event.postback || {};
 
-  // Send a message back to the sender
-  sendMessage(senderId, { text: `You sent a postback with payload: ${payload}` }, pageAccessToken);
-}
+  if (!senderId || !payload) return console.error('Invalid postback event object');
+
+  try {
+    await sendMessage(senderId, { text: `You sent a postback with payload: ${payload}` }, pageAccessToken);
+  } catch (err) {
+    console.error('Error sending postback response:', err.message || err);
+  }
+};
 
 module.exports = { handlePostback };
