@@ -9,11 +9,11 @@ module.exports = {
 
   async execute(senderId, args, pageAccessToken) {
     try {
-      const { data: { result } } = await axios.get(`https://joshweb.click/search/lyrics?q=${encodeURIComponent(args.join(' '))}`);
-      if (result?.lyrics) {
-        const messages = splitMessage(result.title, result.artist, result.lyrics, 2000);
+      const { data } = await axios.get(`https://api.popcat.xyz/lyrics?song=${encodeURIComponent(args.join(' '))}`);
+      if (data?.lyrics) {
+        const messages = splitMessage(data.title, data.artist, data.lyrics, 2000);
         messages.forEach(message => sendMessage(senderId, { text: message }, pageAccessToken));
-        if (result.image) sendMessage(senderId, { attachment: { type: 'image', payload: { url: result.image, is_reusable: true } } }, pageAccessToken);
+        if (data.image) sendMessage(senderId, { attachment: { type: 'image', payload: { url: data.image, is_reusable: true } } }, pageAccessToken);
       } else {
         sendMessage(senderId, { text: 'Sorry, no lyrics were found for your query.' }, pageAccessToken);
       }
