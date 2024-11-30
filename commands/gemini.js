@@ -11,8 +11,8 @@ module.exports = {
     if (!prompt) return sendMessage(senderId, { text: "Usage: gemini <your message>" }, pageAccessToken);
 
     try {
-      const { data } = await axios.get(`https://www.x-noobs-apis.000.pe/nazrul/gemini?prompt=${encodeURIComponent(prompt)}`);
-      sendMessage(senderId, { text: data.nazrul }, pageAccessToken);
+      const { data } = await axios.get(`https://api.kenliejugarap.com/blackbox-gemini/?text=${encodeURIComponent(prompt)}`);
+      sendMessage(senderId, { text: data.response }, pageAccessToken);
     } catch {
       sendMessage(senderId, { text: 'Error generating response. Try again later.' }, pageAccessToken);
     }
