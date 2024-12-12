@@ -4,113 +4,94 @@ const path = require('path');
 const axios = require('axios');
 const { handleMessage } = require('./handles/handleMessage');
 const { handlePostback } = require('./handles/handlePostback');
+require('./handles/sendMessage'); // Global functions
 
 const app = express();
-app.use(express.json());
-
-const VERIFY_TOKEN = 'pagebot';
 const PAGE_ACCESS_TOKEN = fs.readFileSync('token.txt', 'utf8').trim();
 const COMMANDS_PATH = path.join(__dirname, 'commands');
+const API_URL = `https://graph.facebook.com/v21.0`;
 
-// Webhook verification
-app.get('/webhook', (req, res) => {
-  const { 'hub.mode': mode, 'hub.verify_token': token, 'hub.challenge': challenge } = req.query;
+app.use(express.json());
 
-  if (mode && token) {
-    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-      console.log('WEBHOOK_VERIFIED');
-      return res.status(200).send(challenge);
-    }
-    return res.sendStatus(403);
-  }
+app.get('/webhook', (req, res) =>
+  req.query['hub.mode'] === 'subscribe' && req.query['hub.verify_token'] === 'pagebot'
+    ? res.status(200).send(req.query['hub.challenge'])
+    : res.sendStatus(403)
+);
 
-  res.sendStatus(400); // Bad request if neither mode nor token are provided
-});
-
-// Webhook event handling
 app.post('/webhook', (req, res) => {
-  const { body } = req;
-
-  if (body.object === 'page') {
-    // Ensure entry and messaging exist before iterating
-    body.entry?.forEach(entry => {
-      entry.messaging?.forEach(event => {
-        if (event.message) {
-          handleMessage(event, PAGE_ACCESS_TOKEN);
-        } else if (event.postback) {
-          handlePostback(event, PAGE_ACCESS_TOKEN);
-        }
-      });
-    });
-
+  if (req.body.object === 'page') {
+    req.body.entry.forEach(entry => entry.messaging.forEach(event => 
+      (event.message ? handleMessage : handlePostback)(event, PAGE_ACCESS_TOKEN)
+    ));
     return res.status(200).send('EVENT_RECEIVED');
   }
-
   res.sendStatus(404);
 });
 
-// Helper function for Axios requests
-const sendMessengerProfileRequest = async (method, url, data = null) => {
+const sendProfileRequest = async (method, endpoint, data) => {
   try {
-    const response = await axios({
+    const { data: resData } = await axios({
       method,
-      url: `https://graph.facebook.com/v21.0${url}?access_token=${PAGE_ACCESS_TOKEN}`,
+      url: `${API_URL}${endpoint}?access_token=${PAGE_ACCESS_TOKEN}`,
       headers: { 'Content-Type': 'application/json' },
       data
     });
-    return response.data;
+    return resData;
   } catch (error) {
     console.error(`Error in ${method} request:`, error.response?.data || error.message);
     throw error;
   }
 };
 
-// Load all command files from the "commands" directory
-const loadCommands = () => {
-  return fs.readdirSync(COMMANDS_PATH)
+const loadCommands = () => 
+  fs.readdirSync(COMMANDS_PATH)
     .filter(file => file.endsWith('.js'))
-    .map(file => {
-      const command = require(path.join(COMMANDS_PATH, file));
-      return command.name && command.description ? { name: command.name, description: command.description } : null;
-    })
-    .filter(Boolean);
-};
+    .map(file => require(path.join(COMMANDS_PATH, file)))
+    .filter(({ name, description }) => name && description);
 
-// Load or reload Messenger Menu Commands dynamically
 const loadMenuCommands = async (isReload = false) => {
-  const commands = loadCommands();
+  try {
+    // Load all commands
+    const allCommands = loadCommands();
+    const menuCommands = [];
 
-  if (isReload) {
-    // Delete existing commands if reloading
-    await sendMessengerProfileRequest('delete', '/me/messenger_profile', { fields: ['commands'] });
-    console.log('Menu commands deleted successfully.');
+    // Limit to a maximum of 3 buttons for the menu
+    for (let i = 0; i < Math.min(allCommands.length, 3); i++) {
+      menuCommands.push({
+        type: 'postback',
+        title: allCommands[i].name,
+        payload: allCommands[i].name.toUpperCase() + '_COMMAND',
+      });
+    }
+
+    // Add a button to display all commands if there are more than 3
+    if (allCommands.length > 3) {
+      menuCommands.push({
+        type: 'postback',
+        title: 'Show More Commands',
+        payload: 'SHOW_MORE_COMMANDS',
+      });
+    }
+
+    // Send menu commands to Messenger Profile API (replaces the persistent menu)
+    await sendProfileRequest('post', '/me/messenger_profile', {
+      get_started: { payload: 'GET_STARTED_COMMAND' }, // Optional: Get Started button
+      greeting: [{ locale: 'default', text: 'Welcome to the bot!' }],
+      call_to_actions: menuCommands, // Messenger menu commands
+    });
+
+    console.log(`Menu commands ${isReload ? 'reloaded' : 'loaded'} successfully.`);
+  } catch (err) {
+    console.error(`Error ${isReload ? 'reloading' : 'loading'} menu commands:`, err);
   }
-
-  // Load new or updated commands
-  await sendMessengerProfileRequest('post', '/me/messenger_profile', {
-    commands: [{ locale: 'default', commands }],
-  });
-
-  console.log('Menu commands loaded successfully.');
 };
 
-// Watch for changes in the commands directory and reload the commands
-fs.watch(COMMANDS_PATH, (eventType, filename) => {
-  if (['change', 'rename'].includes(eventType) && filename.endsWith('.js')) {
-    loadMenuCommands(true).catch(error => {
-      console.error('Error reloading menu commands:', error);
-    });
-  }
+fs.watch(COMMANDS_PATH, (_, filename) => {
+  if (filename.endsWith('.js')) loadMenuCommands(true).catch(console.error);
 });
 
-// Server initialization
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, async () => {
-  console.log(`Server is running on port ${PORT}`);
-  // Load Messenger Menu Commands asynchronously after the server starts
-  try {
-    await loadMenuCommands(); // Load commands without deleting (initial load)
-  } catch (error) {
-    console.error('Error loading initial menu commands:', error);
-  }
+app.listen(process.env.PORT || 3000, () => {
+  console.log('Server running on port', process.env.PORT || 3000);
+  loadMenuCommands().catch(console.error);
 });
